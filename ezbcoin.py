@@ -68,6 +68,7 @@ while True:
 		m = "NEW BLOCK!"
 		m_width, m_height = draw.textsize(m, font=font)
 		draw.text( ((width - m_width) / 2, (height - m_height) / 2), m, font=font, fill=0)
+		oldHeight = latestHeight
 		# Draw the image buffer.
 		disp.image(image)
 		disp.display()
