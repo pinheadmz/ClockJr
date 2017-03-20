@@ -133,11 +133,11 @@ while True:
 	clearNeopixels()
 	for block in blocks[::-1]:
 		elapsed = currentTime - block['time'] 
-		if  elapsed/60 > 24:
+		if  elapsed/120 > 24:
 			break
 		# modulo ffffff or (255, 255, 255) for color
 		versionColor = hashlib.md5(str(block['header']['result']['version'])).hexdigest()
-		strip.setPixelColor(elapsed/60, Color(int(versionColor[0:2],16), int(versionColor[2:4],16), int(versionColor[4:6],16)))
+		strip.setPixelColor(elapsed/120, Color(int(versionColor[0:2],16), int(versionColor[2:4],16), int(versionColor[4:6],16)))
 				
 	# Clear OLED image buffer by drawing a black filled box.
 	draw.rectangle((0,0,width,height), outline=0, fill=0)
