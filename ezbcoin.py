@@ -4,6 +4,7 @@ import time
 import Adafruit_GPIO.SPI as SPI
 import Adafruit_SSD1306
 import requests
+import hashlib 
 
 from PIL import Image
 from PIL import ImageFont
@@ -66,6 +67,10 @@ def cleanup():
 atexit.register(cleanup)
 
 # Neopixel rainbow cycle
+def clearNeopixels():
+	for i in range(0, strip.numPixels(), 1):
+		strip.setPixelColor(i, Color(0, 0, 0))
+
 def wheel(pos):
 	"""Generate rainbow colors across 0-255 positions."""
 	if pos < 85:
@@ -83,27 +88,36 @@ def rainbowCycle(strip, wait_ms=5, iterations=1):
 			strip.setPixelColor(i, wheel((int(i * 256 / strip.numPixels()) + j) & 255))
 		strip.show()
 		time.sleep(wait_ms/1000.0)
-	for i in range(0, strip.numPixels(), 1):
-		strip.setPixelColor(i, Color(0, 0, 0))
+	clearNeopixels()
 	strip.show()
 
 # Main Loop
 print('Printing to OLED! Ctrl+C to stop...')
-oldHeight = 0
+blocks = []
 while True:
+	currentTime = int(time.time())
+
 	# get bitcoin info and define text
 	info = requests.get('http://x:0123@127.0.0.1:8332/').json()
 	latestHeight = info['chain']['height']
 	latestHash = info['chain']['tip']
-
+	oldHeight = blocks[-1]['info']['chain']['height'] if len(blocks)>0 else 0
+	
 	if latestHeight != oldHeight:
-		# testing neopixels	
-		rainbowCycle(strip)
-		
+		# get new block info
 		params = {"method": "getblockheader", "params": [latestHash]}
 		header = requests.post('http://x:0123@127.0.0.1:8332/', json=params).json()
 		latestVersion = hex(header['result']['version'])[2:]
-		# woha!
+		
+		# store up to 100 recent blocks in memory
+		if len(blocks)>100:
+			blocks.pop(0)
+		blocks.append({"info":info,"header":header,"time":currentTime})
+				
+		# party time for new block!
+		# neopixels party	
+		rainbowCycle(strip)
+		# OLED party
 		draw.rectangle((0,0,width,height), outline=100, fill=255)
 		m = "NEW BLOCK!"
 		m_width, m_height = draw.textsize(m, font=font)
@@ -114,9 +128,19 @@ while True:
 		disp.display()
 		time.sleep(2)
 		
-	# Clear image buffer by drawing a black filled box.
+	# indicate recent blocks around neopixel ring
+	clearNeopixels()
+	for block in blocks[::-1]:
+		elapsed = currentTime - block['time'] 
+		if  elapsed/60 > 24:
+			break
+		# modulo ffffff or (255, 255, 255) for color
+		versionColor = hashlib.md5(str(block['header']['result']['version'])).hexdigest()
+		strip.setPixelColor(elapsed/60, Color(int(versionColor[0:2],16), int(versionColor[2:4],16), int(versionColor[4:6],16)))
+				
+	# Clear OLED image buffer by drawing a black filled box.
 	draw.rectangle((0,0,width,height), outline=0, fill=0)
-
+	# build text for OLED
 	text =  'bcoin version:       '
 	text +=  '%21.21s' % (info['version'])
 	text += 'Latest block info:   '
@@ -124,7 +148,7 @@ while True:
 	text += '%-13.13s%8.8s' % ('version: ', latestVersion)
 	text += '                     '
 
-	# Enumerate characters and draw them
+	# Enumerate characters and draw them to OLED
 	x = 0
 	y = 0 
 	for i, c in enumerate(text):
@@ -140,9 +164,11 @@ while True:
 		draw.text((x, y), c, font=font, fill=255)
 		# Increment x position based on chacacter width.
 		x += char_width
-	# Draw the image buffer.
+		
+	# Draw the OLED image buffer and neopixel strip
 	disp.image(image)
 	disp.display()
+	strip.show()
 	
 	# Pause before requesting info and re-drawing
-	time.sleep(2)
+	time.sleep(1)
