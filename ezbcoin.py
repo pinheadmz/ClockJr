@@ -105,9 +105,10 @@ while True:
 	
 	if latestHeight != oldHeight:
 		# get new block info
-		params = {"method": "getblockheader", "params": [latestHash]}
+		params = {"method": "getblock", "params": [latestHash]}
 		header = requests.post('http://x:0123@127.0.0.1:8332/', json=params).json()
-		latestVersion = hex(header['result']['version'])[2:]
+		latestVersion = header['result']['versionHex']
+		latestSize = header['result']['size']
 		
 		# store up to 100 recent blocks in memory
 		if len(blocks)>100:
@@ -146,7 +147,7 @@ while True:
 	text += 'Latest block info:   '
 	text += '%-8s%13.13s' % ('height: ', latestHeight)
 	text += '%-13.13s%8.8s' % ('version: ', latestVersion)
-	text += '                     '
+	text += '%-13.13s%8.8s' % ('size: ', latestSize)
 
 	# Enumerate characters and draw them to OLED
 	x = 0
