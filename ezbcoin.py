@@ -125,29 +125,41 @@ while True:
 		draw.text( ((width - m_width) / 2, (height - m_height) / 2), m, font=font, fill=0)
 		oldHeight = latestHeight
 		# Draw the image buffer.
-		disp.image(image)
+		rotimage=image.rotate(180)
+		disp.image(rotimage)
 		disp.display()
 		time.sleep(2)
 		
-	# indicate recent blocks around neopixel ring
+	# indicate recent blocks around outer neopixel ring
 	clearNeopixels()
 	for block in blocks[::-1]:
 		elapsed = currentTime - block['time'] 
-		if  elapsed/120 > 24:
+		if  elapsed/120 > 23:
 			break
 		# modulo ffffff or (255, 255, 255) for color
 		versionColor = hashlib.md5(str(block['header']['result']['version'])).hexdigest()
-		strip.setPixelColor(elapsed/120, Color(int(versionColor[0:2],16), int(versionColor[2:4],16), int(versionColor[4:6],16)))
-				
+		strip.setPixelColor((elapsed/120 + 5)%24, Color(int(versionColor[0:2],16), int(versionColor[2:4],16), int(versionColor[4:6],16)))
+	
+	# indicate difficulty adjustment period around inner neopixel ring
+	blocksPerLED = 2016/16
+	blocksElapsedInPeriod = latestHeight%2016
+	elapsedPercent = blocksElapsedInPeriod/2016.0
+	redness = int(elapsedPercent*255)
+	blueness = int((1-elapsedPercent)*255)
+	elapsedLEDs = blocksElapsedInPeriod/blocksPerLED
+	for pixel in range(elapsedLEDs):
+		strip.setPixelColor( 40-((pixel+3)%16), Color(0, redness, blueness))	# G R B for some reason
+					
 	# Clear OLED image buffer by drawing a black filled box.
 	draw.rectangle((0,0,width,height), outline=0, fill=0)
 	# build text for OLED
-	text =  'bcoin version:       '
-	text +=  '%21.21s' % (info['version'])
+	#text =  'bcoin version:       '
+	text =  '%-6s%-15.15s' % ('bcoin:', info['version'])
 	text += 'Latest block info:   '
 	text += '%-8s%13.13s' % ('height: ', latestHeight)
-	text += '%-13.13s%8.8s' % ('version: ', latestVersion)
-	text += '%-13.13s%8.8s' % ('size: ', latestSize)
+	text += '%-13s%8.8s' % ('version: ', latestVersion)
+	text += '%-13s%8.8s' % ('size: ', latestSize)
+	text += '%-15s%6.6s' % ('next diff adj: ', 2016-blocksElapsedInPeriod)
 
 	# Enumerate characters and draw them to OLED
 	x = 0
@@ -167,7 +179,8 @@ while True:
 		x += char_width
 		
 	# Draw the OLED image buffer and neopixel strip
-	disp.image(image)
+	rotimage=image.rotate(180)
+	disp.image(rotimage)
 	disp.display()
 	strip.show()
 	
