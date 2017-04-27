@@ -101,7 +101,7 @@ while True:
 	info = requests.get('http://x:0123@127.0.0.1:8332/').json()
 	latestHeight = info['chain']['height']
 	latestHash = info['chain']['tip']
-	oldHeight = blocks[-1]['info']['chain']['height'] if len(blocks)>0 else 0
+	oldHeight = blocks[-1]['height'] if len(blocks)>0 else 0
 	
 	if latestHeight != oldHeight:
 		# get new block info
@@ -110,10 +110,10 @@ while True:
 		latestVersion = header['result']['versionHex']
 		latestSize = header['result']['size']
 		
-		# store up to 100 recent blocks in memory
-		if len(blocks)>100:
+		# store up to 40 recent blocks in memory
+		if len(blocks)>40:
 			blocks.pop(0)
-		blocks.append({"info":info,"header":header,"time":currentTime})
+		blocks.append({"height":latestHeight,"hash":latestHash,"version":latestVersion,"size":latestSize,"time":currentTime})
 				
 		# party time for new block!
 		# neopixels party	
@@ -129,7 +129,9 @@ while True:
 		disp.image(rotimage)
 		disp.display()
 		time.sleep(2)
-		
+		#debug
+		print(blocks)
+
 	# indicate recent blocks around outer neopixel ring
 	clearNeopixels()
 	for block in blocks[::-1]:
@@ -137,7 +139,7 @@ while True:
 		if  elapsed/120 > 23:
 			break
 		# modulo ffffff or (255, 255, 255) for color
-		versionColor = hashlib.md5(str(block['header']['result']['version'])).hexdigest()
+		versionColor = hashlib.md5(str(block['version'])).hexdigest()
 		strip.setPixelColor((elapsed/120 + 5)%24, Color(int(versionColor[0:2],16), int(versionColor[2:4],16), int(versionColor[4:6],16)))
 	
 	# indicate difficulty adjustment period around inner neopixel ring
@@ -185,4 +187,4 @@ while True:
 	strip.show()
 	
 	# Pause before requesting info and re-drawing
-	time.sleep(1)
+	time.sleep(5)
