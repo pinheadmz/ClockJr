@@ -109,11 +109,20 @@ while True:
 		header = requests.post('http://x:0123@127.0.0.1:8332/', json=params).json()
 		latestVersion = header['result']['versionHex']
 		latestSize = header['result']['size']
+		latestCoinbase = header['result']['coinbase']
+		# clean up hex from coinbase
+		coinbasestring = ""
+		for i in xrange(0, len(latestCoinbase)-2, 2):
+			c = latestCoinbase[i:i+2]
+			cint = int(c, 16)
+			if not 126 > cint > 32:
+				continue
+			coinbasestring += chr(cint)
 		
 		# store up to 40 recent blocks in memory
 		if len(blocks)>40:
 			blocks.pop(0)
-		blocks.append({"height":latestHeight,"hash":latestHash,"version":latestVersion,"size":latestSize,"time":currentTime})
+		blocks.append({"height":latestHeight,"hash":latestHash,"coinbase":coinbasestring,"version":latestVersion,"size":latestSize,"time":currentTime})
 				
 		# party time for new block!
 		# neopixels party	
@@ -148,9 +157,9 @@ while True:
 	elapsedPercent = blocksElapsedInPeriod/2016.0
 	redness = int(elapsedPercent*255)
 	blueness = int((1-elapsedPercent)*255)
-	elapsedLEDs = blocksElapsedInPeriod/blocksPerLED
+	elapsedLEDs = (blocksElapsedInPeriod/blocksPerLED) + 1
 	for pixel in range(elapsedLEDs):
-		strip.setPixelColor( 40-((pixel+3)%16), Color(0, redness, blueness))	# G R B for some reason
+		strip.setPixelColor( 39-((pixel+2)%16), Color(0, redness, blueness))	# G R B for some reason
 					
 	# Clear OLED image buffer by drawing a black filled box.
 	draw.rectangle((0,0,width,height), outline=0, fill=0)
