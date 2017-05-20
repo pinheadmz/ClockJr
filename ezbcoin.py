@@ -5,6 +5,9 @@ import Adafruit_GPIO.SPI as SPI
 import Adafruit_SSD1306
 import requests
 import hashlib 
+import re
+import psutil
+import os
 
 from PIL import Image
 from PIL import ImageFont
@@ -66,6 +69,28 @@ def cleanup():
 	strip.show()
 atexit.register(cleanup)
 
+# is bcoin running?
+def isBcoin():
+	isit = False
+	for pid in psutil.pids():
+		if "bcoin" in psutil.Process(pid).name():
+			isit = True
+	return isit
+
+# restart bcoin if its not running
+def checkAndRestartBcoin():
+	print('checking for bcoin...')
+	if not isBcoin():
+		print('bcoin is not running, restarting...')
+		os.system('su -c "bcoin --prune --daemon" - pi')
+		print('giving bcoin a 30 sec head start...')
+		for i in range(30):
+			print(30-i)
+			time.sleep(1)
+	else:
+		print('bcoin process found!')
+	return True
+
 # Neopixel rainbow cycle
 def clearNeopixels():
 	for i in range(0, strip.numPixels(), 1):
@@ -91,22 +116,73 @@ def rainbowCycle(strip, wait_ms=5, iterations=1):
 	clearNeopixels()
 	strip.show()
 
+def OLEDtext(text):
+	# Clear OLED image buffer by drawing a black filled box.
+	draw.rectangle((0,0,width,height), outline=0, fill=0)
+	# Enumerate characters and draw them to OLED
+	x = 0
+	y = 0
+	for i, c in enumerate(text):
+		# get char dimensions
+		char_width, char_height = draw.textsize(c, font=font)
+		# advance to edge but don't cut off any chars, then new line to bottom
+		if x + char_width > width:
+			y += char_height # i guess we assume all chars are similar height?
+			x = 0
+		if x > width and y > height:
+			break
+		# Draw text.
+		draw.text((x, y), c, font=font, fill=255)
+		# Increment x position based on chacacter width.
+		x += char_width
+	# push image to screen
+	rotimage=image.rotate(180)
+	disp.image(rotimage)
+	disp.display()
+
+
 # Main Loop
-print('Printing to OLED! Ctrl+C to stop...')
+checkAndRestartBcoin()
+print('Clock Jr. away!')
 blocks = []
 while True:
 	currentTime = int(time.time())
 
 	# get bitcoin info and define text
-	info = requests.get('http://x:0123@127.0.0.1:8332/').json()
+	try:
+		info = requests.get('http://x:0123@127.0.0.1:8332/').json()
+	except:
+		print("Error:", sys.exc_info()[0])
+		checkAndRestartBcoin()
+		time.sleep(5)
+		continue	
+	
+	progress = info['chain']['progress']
 	latestHeight = info['chain']['height']
 	latestHash = info['chain']['tip']
 	oldHeight = blocks[-1]['height'] if len(blocks)>0 else 0
 	
+	# if we're still catching up, don't do the whole thing
+	if progress != 1:
+		text = 'bcoin is catching up!'
+		text += '%-10s%-9s%-2.1s' % ('progress: ', int(progress*100000000)/1000000.0, '%')
+		text += '%-8s%13.13s' % ('height: ', latestHeight)
+		# write text to OLED
+		OLEDtext(text)
+		time.sleep(10)
+		continue
+	
 	if latestHeight != oldHeight:
 		# get new block info
 		params = {"method": "getblock", "params": [latestHash]}
-		header = requests.post('http://x:0123@127.0.0.1:8332/', json=params).json()
+		try:
+			header = requests.post('http://x:0123@127.0.0.1:8332/', json=params).json()
+		except:
+			print("Error:", sys.exc_info()[0])
+			checkAndRestartBcoin()
+			time.sleep(5)
+			continue	
+	
 		latestVersion = header['result']['versionHex']
 		latestSize = header['result']['size']
 		latestCoinbase = header['result']['coinbase']
@@ -118,11 +194,17 @@ while True:
 			if not 126 > cint > 32:
 				continue
 			coinbasestring += chr(cint)
-		
+		extraVersion = ""
+		# anything interesting in that coinbase?
+		if "/AD" and "/EB" in coinbasestring:
+			extraVersion = re.search('/EB[0-9]+/AD[0-9]+/', coinbasestring).group(0)
+		if "/EXTBLK/" in coinbasestring:
+			extraVersion = "/EXTBLK/"
+			
 		# store up to 40 recent blocks in memory
 		if len(blocks)>40:
 			blocks.pop(0)
-		blocks.append({"height":latestHeight,"hash":latestHash,"coinbase":coinbasestring,"version":latestVersion,"size":latestSize,"time":currentTime})
+		blocks.append({"height":latestHeight,"hash":latestHash,"coinbase":coinbasestring,"version":latestVersion,"extraVersion":extraVersion,"size":latestSize,"time":currentTime})
 				
 		# party time for new block!
 		# neopixels party	
@@ -139,7 +221,9 @@ while True:
 		disp.display()
 		time.sleep(2)
 		#debug
-		print(blocks)
+		print('--')
+		for block in blocks:
+			print(block)
 
 	# indicate recent blocks around outer neopixel ring
 	clearNeopixels()
@@ -148,7 +232,7 @@ while True:
 		if  elapsed/120 > 23:
 			break
 		# modulo ffffff or (255, 255, 255) for color
-		versionColor = hashlib.md5(str(block['version'])).hexdigest()
+		versionColor = hashlib.md5(str(block['version']) + block['extraVersion']).hexdigest()
 		strip.setPixelColor((elapsed/120 + 5)%24, Color(int(versionColor[0:2],16), int(versionColor[2:4],16), int(versionColor[4:6],16)))
 	
 	# indicate difficulty adjustment period around inner neopixel ring
@@ -161,38 +245,20 @@ while True:
 	for pixel in range(elapsedLEDs):
 		strip.setPixelColor( 39-((pixel+2)%16), Color(0, redness, blueness))	# G R B for some reason
 					
-	# Clear OLED image buffer by drawing a black filled box.
-	draw.rectangle((0,0,width,height), outline=0, fill=0)
 	# build text for OLED
 	#text =  'bcoin version:       '
-	text =  '%-6s%-15.15s' % ('bcoin:', info['version'])
-	text += 'Latest block info:   '
+	#text =  '%-6s%-15.15s' % ('bcoin:', info['version'])
+	text = 'Latest block info:   '
 	text += '%-8s%13.13s' % ('height: ', latestHeight)
 	text += '%-13s%8.8s' % ('version: ', latestVersion)
+	text += '%21.21s' % (extraVersion)
 	text += '%-13s%8.8s' % ('size: ', latestSize)
 	text += '%-15s%6.6s' % ('next diff adj: ', 2016-blocksElapsedInPeriod)
 
-	# Enumerate characters and draw them to OLED
-	x = 0
-	y = 0 
-	for i, c in enumerate(text):
-		# get char dimensions
-		char_width, char_height = draw.textsize(c, font=font)
-		# advance to edge but don't cut off any chars, then new line to bottom
-		if x + char_width > width:
-			y += char_height # i guess we assume all chars are similar height?
-			x = 0
-		if x > width and y > height:
-			break
-		# Draw text.
-		draw.text((x, y), c, font=font, fill=255)
-		# Increment x position based on chacacter width.
-		x += char_width
+	# write text to OLED
+	OLEDtext(text)
 		
-	# Draw the OLED image buffer and neopixel strip
-	rotimage=image.rotate(180)
-	disp.image(rotimage)
-	disp.display()
+	# paint the neopixel strip
 	strip.show()
 	
 	# Pause before requesting info and re-drawing
