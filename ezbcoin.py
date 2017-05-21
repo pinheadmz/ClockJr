@@ -8,6 +8,7 @@ import hashlib
 import re
 import psutil
 import os
+import sys
 
 from PIL import Image
 from PIL import ImageFont
