@@ -61,6 +61,8 @@ strip = Adafruit_NeoPixel(LED_COUNT, LED_PIN, LED_FREQ_HZ, LED_DMA, LED_INVERT, 
 strip.begin()
 
 ### CLOCK Jr. ###
+DISPLAYS = True
+
 # clear screen on exit
 def cleanup():
 	disp.clear()
@@ -120,6 +122,12 @@ def rainbowCycle(strip, wait_ms=5, iterations=1):
 def OLEDtext(text):
 	# Clear OLED image buffer by drawing a black filled box.
 	draw.rectangle((0,0,width,height), outline=0, fill=0)
+	# Stop here if displays are OFF!
+	if not DISPLAYS:
+		disp.image(image)
+		disp.display()
+		return True
+	
 	# Enumerate characters and draw them to OLED
 	x = 0
 	y = 0
@@ -141,6 +149,22 @@ def OLEDtext(text):
 	disp.image(rotimage)
 	disp.display()
 
+# read php-ui-generated files from commands folder
+def readCommands():
+	try:
+		cmdfile = open("/home/pi/clockjr/commands/.clockjrcommand","r")
+	except:
+		return False
+	
+	command = cmdfile.read()
+	print "Web UI Command received: " + command
+	if command == "P":
+		rainbowCycle(strip)
+	if command == "O":
+		global DISPLAYS
+		DISPLAYS = not DISPLAYS
+	os.remove("/home/pi/clockjr/commands/.clockjrcommand")
+	return True
 
 # Main Loop
 checkAndRestartBcoin()
@@ -226,27 +250,33 @@ while True:
 		for block in blocks:
 			print(block)
 
-	# indicate recent blocks around outer neopixel ring
-	clearNeopixels()
-	for block in blocks[::-1]:
-		elapsed = currentTime - block['time'] 
-		if  elapsed/120 > 23:
-			break
-		# modulo ffffff or (255, 255, 255) for color
-		versionColor = hashlib.md5(str(block['version']) + block['extraVersion']).hexdigest()
-		strip.setPixelColor((elapsed/120 + 5)%24, Color(int(versionColor[0:2],16), int(versionColor[2:4],16), int(versionColor[4:6],16)))
-	
-	# indicate difficulty adjustment period around inner neopixel ring
+	# build sequence for neopixel strip
 	blocksPerLED = 2016/16
 	blocksElapsedInPeriod = latestHeight%2016
 	elapsedPercent = blocksElapsedInPeriod/2016.0
 	redness = int(elapsedPercent*255)
 	blueness = int((1-elapsedPercent)*255)
 	elapsedLEDs = (blocksElapsedInPeriod/blocksPerLED) + 1
-	for pixel in range(elapsedLEDs):
-		strip.setPixelColor( 39-((pixel+2)%16), Color(0, redness, blueness))	# G R B for some reason
-					
-	# build text for OLED
+
+	# push to strip!
+	clearNeopixels()
+	if DISPLAYS:
+		# indicate recent blocks around outer neopixel ring
+		for block in blocks[::-1]:
+			elapsed = currentTime - block['time'] 
+			if  elapsed/120 > 23:
+				break
+			# modulo ffffff or (255, 255, 255) for color
+			versionColor = hashlib.md5(str(block['version']) + block['extraVersion']).hexdigest()
+			strip.setPixelColor((elapsed/120 + 5)%24, Color(int(versionColor[0:2],16), int(versionColor[2:4],16), int(versionColor[4:6],16)))
+		# indicate difficulty adjustment period around inner neopixel ring
+		for pixel in range(elapsedLEDs):
+			strip.setPixelColor( 39-((pixel+2)%16), Color(0, redness, blueness))	# G R B for some reason
+		
+	# paint the neopixel strip
+	strip.show()
+	
+		# build text for OLED
 	#text =  'bcoin version:       '
 	#text =  '%-6s%-15.15s' % ('bcoin:', info['version'])
 	text = 'Latest block info:   '
@@ -258,9 +288,11 @@ while True:
 
 	# write text to OLED
 	OLEDtext(text)
-		
-	# paint the neopixel strip
-	strip.show()
 	
 	# Pause before requesting info and re-drawing
-	time.sleep(5)
+	for i in range(10):
+		# get user input. wait up to 10 seconds for command. if command, don't wait any more!
+		if not readCommands():
+			time.sleep(0.5)
+		else:
+			break
