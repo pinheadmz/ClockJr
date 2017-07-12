@@ -11,8 +11,15 @@
 		$cmdfile;
 		fwrite($cmdfile, $command);
 		fclose($cmdfile);
+		header('Location: /');
 	}
+	
+	$log = shell_exec("tail -n 10 /home/pi/clockjr/clockjr.log | tac");
+	
 ?>
 
 <a href="?cmd=P" style="width:100%;font-size:250px">Party</a>
 <a href="?cmd=O" style="width:100%;font-size:250px">On/Off</a>
+<pre>
+<?php echo $log ?>
+</pre>

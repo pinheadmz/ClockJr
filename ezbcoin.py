@@ -76,8 +76,11 @@ atexit.register(cleanup)
 def isBcoin():
 	isit = False
 	for pid in psutil.pids():
-		if "bcoin" in psutil.Process(pid).name():
-			isit = True
+		try:
+			if "bcoin" in psutil.Process(pid).name():
+				isit = True
+		except:
+			continue
 	return isit
 
 # restart bcoin if its not running
@@ -85,7 +88,7 @@ def checkAndRestartBcoin():
 	print('checking for bcoin...')
 	if not isBcoin():
 		print('bcoin is not running, restarting...')
-		os.system('su -c "bcoin --prune --daemon" - pi')
+		os.system('su -c "bcoin --prune --daemon --listen=false --selfish" - pi')
 		print('giving bcoin a 30 sec head start...')
 		for i in range(30):
 			print(30-i)
@@ -222,7 +225,7 @@ while True:
 		extraVersion = ""
 		# anything interesting in that coinbase?
 		if "/AD" and "/EB" in coinbasestring:
-			extraVersion = re.search('/EB[0-9]+/AD[0-9]+/', coinbasestring).group(0)
+			extraVersion = re.search('/EB[0-9.]+/AD[0-9.]+/', coinbasestring).group(0)
 		if "/EXTBLK/" in coinbasestring:
 			extraVersion = "/EXTBLK/"
 			
@@ -232,20 +235,21 @@ while True:
 		blocks.append({"height":latestHeight,"hash":latestHash,"coinbase":coinbasestring,"version":latestVersion,"extraVersion":extraVersion,"size":latestSize,"time":currentTime})
 				
 		# party time for new block!
-		# neopixels party	
-		rainbowCycle(strip)
-		# OLED party
-		draw.rectangle((0,0,width,height), outline=100, fill=255)
-		m = "NEW BLOCK!"
-		m_width, m_height = draw.textsize(m, font=font)
-		draw.text( ((width - m_width) / 2, (height - m_height) / 2), m, font=font, fill=0)
+		if DISPLAYS:
+			# neopixels party	
+			rainbowCycle(strip)
+			# OLED party
+			draw.rectangle((0,0,width,height), outline=100, fill=255)
+			m = "NEW BLOCK!"
+			m_width, m_height = draw.textsize(m, font=font)
+			draw.text( ((width - m_width) / 2, (height - m_height) / 2), m, font=font, fill=0)
+			# Draw the image buffer.
+			rotimage=image.rotate(180)
+			disp.image(rotimage)
+			disp.display()
+			time.sleep(2)
 		oldHeight = latestHeight
-		# Draw the image buffer.
-		rotimage=image.rotate(180)
-		disp.image(rotimage)
-		disp.display()
-		time.sleep(2)
-		#debug
+		# debug
 		print('--')
 		for block in blocks:
 			print(block)
