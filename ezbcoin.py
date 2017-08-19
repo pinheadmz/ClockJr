@@ -9,6 +9,7 @@ import re
 import psutil
 import os
 import sys
+import json
 
 from PIL import Image
 from PIL import ImageFont
@@ -53,10 +54,12 @@ LED_FREQ_HZ    = 800000  # LED signal frequency in hertz (usually 800khz)
 LED_DMA        = 5       # DMA channel to use for generating signal (try 5)
 LED_BRIGHTNESS = 10     # Set to 0 for darkest and 255 for brightest
 LED_INVERT     = False   # True to invert the signal (when using NPN transistor level shift)
+LED_CHANNEL    = 0       # set to '1' for GPIOs 13, 19, 41, 45 or 53
+LED_STRIP      = ws.WS2811_STRIP_GRB   # Strip type and colour ordering
 
 ### NEOPIXEL INIT ###
 # Create NeoPixel object with appropriate configuration.
-strip = Adafruit_NeoPixel(LED_COUNT, LED_PIN, LED_FREQ_HZ, LED_DMA, LED_INVERT, LED_BRIGHTNESS)
+strip = Adafruit_NeoPixel(LED_COUNT, LED_PIN, LED_FREQ_HZ, LED_DMA, LED_INVERT, LED_BRIGHTNESS, LED_CHANNEL, LED_STRIP)
 # Intialize the library (must be called once before other functions).
 strip.begin()
 
@@ -169,10 +172,29 @@ def readCommands():
 	os.remove("/home/pi/clockjr/commands/.clockjrcommand")
 	return True
 
+# get price
+def getPriceString():
+	try:
+		# try coinbase first
+		r = requests.get('https://api.coinbase.com/v2/prices/BTC-USD/spot')
+		rj = json.loads(r.text)
+		price = rj['data']['amount']
+		return '%-7s%14.14s' % ('price: ', '${:,.2f}'.format(float(price)))
+	except:
+		# try blockchain.info next 
+		r = requests.get('https://blockchain.info/ticker')
+		rj = json.loads(r.text)
+		price = rj['USD']['last']
+		return '%-7s%14.14s' % ('price: ', '${:,.2f}'.format(float(price)))
+		except:
+			# give up getting price
+			return '%-7s%14.14s' % ('price: ', 'n/a')
+
 # Main Loop
 checkAndRestartBcoin()
 print('Clock Jr. away!')
 blocks = []
+priceString = ''
 while True:
 	currentTime = int(time.time())
 
@@ -233,7 +255,10 @@ while True:
 		if len(blocks)>40:
 			blocks.pop(0)
 		blocks.append({"height":latestHeight,"hash":latestHash,"coinbase":coinbasestring,"version":latestVersion,"extraVersion":extraVersion,"size":latestSize,"time":currentTime})
-				
+		
+		# get the price
+		priceString = getPriceString()
+		
 		# party time for new block!
 		if DISPLAYS:
 			# neopixels party	
@@ -283,7 +308,8 @@ while True:
 		# build text for OLED
 	#text =  'bcoin version:       '
 	#text =  '%-6s%-15.15s' % ('bcoin:', info['version'])
-	text = 'Latest block info:   '
+	#text = 'Latest block info:   '
+	text = priceString
 	text += '%-8s%13.13s' % ('height: ', latestHeight)
 	text += '%-13s%8.8s' % ('version: ', latestVersion)
 	text += '%21.21s' % (extraVersion)

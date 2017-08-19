@@ -9,7 +9,8 @@ def addWifi():
 		return False
 
 	command = cmdfile.read()
-	print "WiFi info received: " + command
+	print "WiFi info received:"
+	print command
 
 	try:
 		with open("/etc/wpa_supplicant/wpa_supplicant.conf", "a") as wpafile:
@@ -22,18 +23,21 @@ def addWifi():
 	return True
 	
 def checkInternet():
-	 """
-	 Host: 8.8.8.8 (google-public-dns-a.google.com)
-	 OpenPort: 53/tcp
-	 Service: domain (DNS/TCP)
-	 """
-	 host="8.8.8.8"
-	 port=53
-	 timeout=3
-	 try:
+	"""
+	Host: 8.8.8.8 (google-public-dns-a.google.com)
+	OpenPort: 53/tcp
+	Service: domain (DNS/TCP)
+	"""
+	host="8.8.8.8"
+	port=53
+	timeout=3
+	try:
+		print "Attempting connection to 8.8.8.8"
 		socket.setdefaulttimeout(timeout)
-		socket.socket(socket.AF_INET, socket.SOCK_STREAM).connect((host, port))
+		s = socket.socket(socket.AF_INET, socket.SOCK_STREAM).connect((host, port))
 		return True
-	 except Exception as ex:
+	except Exception as ex:
 		print ex.message
 		return False
+	print "End of checkInternet() reached"
+	return False
