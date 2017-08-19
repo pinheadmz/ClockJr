@@ -213,7 +213,7 @@ def checkAndGetWiFi():
 	# OK maybe we need some credentials to get internet
 	text = '%-21.21s' % ("No internet detected")
 	text += '%-21.21s' % ("Starting ad-hoc WiFi")
-	text += '%-21.21s' % ("ssid: clockjr")
+	text += '%-21.21s' % ("ssid: ClockJr")
 	text += '%-21.21s' % ("pw:   2themoon")
 	text += '%-21.21s' % ("http://192.168.0.1")
 	# write text to OLED
