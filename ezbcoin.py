@@ -11,6 +11,9 @@ import os
 import sys
 import json
 
+sys.path.append("/home/pi/clockjr/wififiles")
+from addwifi import *
+
 from PIL import Image
 from PIL import ImageFont
 from PIL import ImageDraw
@@ -91,13 +94,16 @@ def checkAndRestartBcoin():
 	print('checking for bcoin...')
 	if not isBcoin():
 		print('bcoin is not running, restarting...')
+		OLEDtext("Starting bcoin...")
 		os.system('su -c "bcoin --prune --daemon --listen=false --selfish" - pi')
 		print('giving bcoin a 30 sec head start...')
 		for i in range(30):
 			print(30-i)
+			OLEDtext("Waiting for bcoin... " + str(30-i))
 			time.sleep(1)
 	else:
 		print('bcoin process found!')
+		OLEDtext("bcoin is running!")
 	return True
 
 # Neopixel rainbow cycle
@@ -181,20 +187,59 @@ def getPriceString():
 		price = rj['data']['amount']
 		return '%-7s%14.14s' % ('price: ', '${:,.2f}'.format(float(price)))
 	except:
-		# try blockchain.info next 
-		r = requests.get('https://blockchain.info/ticker')
-		rj = json.loads(r.text)
-		price = rj['USD']['last']
-		return '%-7s%14.14s' % ('price: ', '${:,.2f}'.format(float(price)))
+		try:
+			# try blockchain.info next 
+			r = requests.get('https://blockchain.info/ticker')
+			rj = json.loads(r.text)
+			price = rj['USD']['last']
+			return '%-7s%14.14s' % ('price: ', '${:,.2f}'.format(float(price)))
 		except:
 			# give up getting price
 			return '%-7s%14.14s' % ('price: ', 'n/a')
 
-# Main Loop
+# check for and establish internet connection
+def checkAndGetWiFi():
+	# give Pi a chance to connect to WiFi, maybe it already has credentials
+	for i in range(60):
+		if checkInternet():
+			return True
+		text = '%-21.21s' % ("No internet detected")
+		text += '%-21.21s' % ("Switching to ad-hoc")
+		text += '%-21.21s' % ("in: " + str (60-i) + " seconds")
+		# write text to OLED
+		OLEDtext(text)
+		time.sleep(1)
+
+	# OK maybe we need some credentials to get internet
+	text = '%-21.21s' % ("No internet detected")
+	text += '%-21.21s' % ("Starting ad-hoc WiFi")
+	text += '%-21.21s' % ("ssid: clockjr")
+	text += '%-21.21s' % ("pw:   2themoon")
+	text += '%-21.21s' % ("http://192.168.0.1")
+	# write text to OLED
+	OLEDtext(text)
+	os.system("sudo /home/pi/clockjr/wififiles/adhocON.sh")
+	while not addWifi():
+		time.sleep(5)
+	os.system("sudo /home/pi/clockjr/wififiles/adhocOFF.sh")
+	text = '%-21.21s' % ("WiFi info received!")
+	text += '%-21.21s' % ("Attempting to connect")
+	# write text to OLED
+	OLEDtext(text)
+	# give it a few seconds
+	time.sleep(30)
+
+##### Program begin #####
+while not checkInternet():
+	checkAndGetWiFi()
+
 checkAndRestartBcoin()
-print('Clock Jr. away!')
+print('Clock Jr. starting!')
+OLEDtext("Clock Jr. starting!")
 blocks = []
 priceString = ''
+
+# Main Loop
 while True:
 	currentTime = int(time.time())
 
@@ -290,7 +335,7 @@ while True:
 			strip.setPixelColor((elapsed/120 + 5)%24, Color(int(versionColor[0:2],16), int(versionColor[2:4],16), int(versionColor[4:6],16)))
 		# indicate difficulty adjustment period around inner neopixel ring
 		for pixel in range(elapsedLEDs):
-			strip.setPixelColor( 39-((pixel+2)%16), Color(0, redness, blueness))	# G R B for some reason
+			strip.setPixelColor( 39-((pixel+2)%16), Color(redness, 0, blueness))
 		
 	# paint the neopixel strip
 	strip.show()
@@ -304,7 +349,7 @@ while True:
 		OLEDtext(text)
 		# don't bother bcoin too much while its syncing
 		waitBeforeReloadBcoinInfo = 30
-	else
+	else:
 		# we're synced! print stats	to OLED
 		text = priceString
 		text += '%-8s%13.13s' % ('height: ', latestHeight)
