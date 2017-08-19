@@ -212,16 +212,6 @@ while True:
 	latestHash = info['chain']['tip']
 	oldHeight = blocks[-1]['height'] if len(blocks)>0 else 0
 	
-	# if we're still catching up, don't do the whole thing
-	if progress != 1:
-		text = 'bcoin is catching up!'
-		text += '%-10s%-9s%-2.1s' % ('progress: ', int(progress*100000000)/1000000.0, '%')
-		text += '%-8s%13.13s' % ('height: ', latestHeight)
-		# write text to OLED
-		OLEDtext(text)
-		time.sleep(10)
-		continue
-	
 	if latestHeight != oldHeight:
 		# get new block info
 		params = {"method": "getblock", "params": [latestHash]}
@@ -304,24 +294,32 @@ while True:
 		
 	# paint the neopixel strip
 	strip.show()
-	
-		# build text for OLED
-	#text =  'bcoin version:       '
-	#text =  '%-6s%-15.15s' % ('bcoin:', info['version'])
-	#text = 'Latest block info:   '
-	text = priceString
-	text += '%-8s%13.13s' % ('height: ', latestHeight)
-	text += '%-13s%8.8s' % ('version: ', latestVersion)
-	text += '%21.21s' % (extraVersion)
-	text += '%-13s%8.8s' % ('size: ', latestSize)
-	text += '%-15s%6.6s' % ('next diff adj: ', 2016-blocksElapsedInPeriod)
 
-	# write text to OLED
-	OLEDtext(text)
+	# if we're still catching up, print progress
+	if progress != 1:
+		text = 'bcoin is catching up!'
+		text += '%-10s%-9s%-2.1s' % ('progress: ', int(progress*100000000)/1000000.0, '%')
+		text += '%-8s%13.13s' % ('height: ', latestHeight)
+		# write text to OLED
+		OLEDtext(text)
+		# don't bother bcoin too much while its syncing
+		waitBeforeReloadBcoinInfo = 30
+	else
+		# we're synced! print stats	to OLED
+		text = priceString
+		text += '%-8s%13.13s' % ('height: ', latestHeight)
+		text += '%-13s%8.8s' % ('version: ', latestVersion)
+		text += '%21.21s' % (extraVersion)
+		text += '%-13s%8.8s' % ('size: ', latestSize)
+		text += '%-15s%6.6s' % ('next diff adj: ', 2016-blocksElapsedInPeriod)
+		# write text to OLED
+		OLEDtext(text)
+		# bother bcoin a lot if we're synced!
+		waitBeforeReloadBcoinInfo = 5
 	
 	# Pause before requesting info and re-drawing
-	for i in range(10):
-		# get user input. wait up to 10 seconds for command. if command, don't wait any more!
+	for i in range(waitBeforeReloadBcoinInfo * 2):
+		# Get user input. Check every 1/2 sec for command. If command, restart whole loop
 		if not readCommands():
 			time.sleep(0.5)
 		else:
