@@ -19,6 +19,13 @@ from PIL import ImageFont
 from PIL import ImageDraw
 from neopixel import *
 
+### BCOIN startup command ###
+BCOIN_SPV = True
+if BCOIN_SPV:
+	BCOIN_COMMAND = "bcoin --spv --daemon --listen=false --selfish --log-file=false"
+else:
+	BCOIN_COMMAND = "bcoin --prune --daemon --listen=false --selfish --log-file=false"
+
 ### OLED DISPLAY CONFIG ###
 # Raspberry Pi pin configuration:
 RST = 24
@@ -95,7 +102,7 @@ def checkAndRestartBcoin():
 	if not isBcoin():
 		print('bcoin is not running, restarting...')
 		OLEDtext("Starting bcoin...")
-		os.system('su -c "bcoin --prune --daemon --listen=false --selfish" - pi')
+		os.system('su -c "' + BCOIN_COMMAND + '" - pi')
 		print('giving bcoin a 30 sec head start...')
 		for i in range(30):
 			print(30-i)
@@ -259,18 +266,32 @@ while True:
 	
 	if latestHeight != oldHeight:
 		# get new block info
-		params = {"method": "getblock", "params": [latestHash]}
-		try:
-			header = requests.post('http://x:0123@127.0.0.1:8332/', json=params).json()
-		except:
-			print("Error:", sys.exc_info()[0])
-			checkAndRestartBcoin()
-			time.sleep(5)
-			continue	
-	
-		latestVersion = header['result']['versionHex']
-		latestSize = header['result']['size']
-		latestCoinbase = header['result']['coinbase']
+		if BCOIN_SPV:
+			params = {"method": "getblockheader", "params": [latestHash]}
+			try:
+				header = requests.post('http://x:0123@127.0.0.1:8332/', json=params).json()
+			except:
+				print("Error:", sys.exc_info()[0])
+				checkAndRestartBcoin()
+				time.sleep(5)
+				continue
+			latestVersion = header['result']['versionHex']
+			latestSize = '(SPV mode)'
+			latestCoinbase = ''
+		else:
+			params = {"method": "getblock", "params": [latestHash]}
+			try:
+				header = requests.post('http://x:0123@127.0.0.1:8332/', json=params).json()
+			except:
+				print("Error:", sys.exc_info()[0])
+				checkAndRestartBcoin()
+				time.sleep(5)
+				continue
+			latestVersion = header['result']['versionHex']
+			latestSize = header['result']['size']
+			latestCoinbase = header['result']['coinbase']
+		
+		
 		# clean up hex from coinbase
 		coinbasestring = ""
 		for i in xrange(0, len(latestCoinbase)-2, 2):
@@ -355,7 +376,7 @@ while True:
 		text += '%-8s%13.13s' % ('height: ', latestHeight)
 		text += '%-13s%8.8s' % ('version: ', latestVersion)
 		text += '%21.21s' % (extraVersion)
-		text += '%-13s%8.8s' % ('size: ', latestSize)
+		text += '%-6s%15.15s' % ('size: ', latestSize)
 		text += '%-15s%6.6s' % ('next diff adj: ', 2016-blocksElapsedInPeriod)
 		# write text to OLED
 		OLEDtext(text)
