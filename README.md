@@ -28,6 +28,9 @@ Run this command to link the included PHP script to the web root directory:
 
 `ln -s ~/clockjr/clockjrwww.php /var/www/html/index.php`
 
+NOTE: To use SPV mode (default) a small patch is recommended in the bcoin source to print coinbase scriptSigs to disk so the Clock Jr script can retrive them:
+
+https://github.com/pinheadmz/bcoin/commit/b65e499533b2b8507cd5be9bfbf853fa674abede
 
 ### Hardware:
 Here's a "wishlist" I made on Adafruit (accepts Bitcoin!) with most the components I used for the build:

@@ -20,6 +20,7 @@ from PIL import ImageDraw
 from neopixel import *
 
 ### BCOIN startup command ###
+# SPV mode requires mofications to bcoin/bin/spvnode, see README
 BCOIN_SPV = True
 if BCOIN_SPV:
 	BCOIN_COMMAND = "bcoin --spv --daemon --listen=false --selfish --log-file=false"
@@ -61,7 +62,7 @@ draw = ImageDraw.Draw(image)
 LED_COUNT      = 40      # Number of LED pixels.
 LED_PIN        = 18      # GPIO pin connected to the pixels (must support PWM!).
 LED_FREQ_HZ    = 800000  # LED signal frequency in hertz (usually 800khz)
-LED_DMA        = 5       # DMA channel to use for generating signal (try 5)
+LED_DMA        = 10       # DMA channel to use for generating signal (try 5)
 LED_BRIGHTNESS = 10     # Set to 0 for darkest and 255 for brightest
 LED_INVERT     = False   # True to invert the signal (when using NPN transistor level shift)
 LED_CHANNEL    = 0       # set to '1' for GPIOs 13, 19, 41, 45 or 53
@@ -276,8 +277,29 @@ while True:
 				time.sleep(5)
 				continue
 			latestVersion = header['result']['versionHex']
-			latestSize = '(SPV mode)'
-			latestCoinbase = ''
+			latestSize = "(SPV mode)"
+			latestCoinbase = ""
+			try:
+				# get block size from 3rd party API
+				j = requests.get('https://blockchain.info/rawblock/' + latestHash).json()
+				latestSize = j['size']
+			except:
+                                print("Error:", sys.exc_info()[0])
+				# wait a few seconds then try again, sometimes blockchain.info is behind
+				try:
+					time.sleep(10)
+					k = requests.get('https://blockchain.info/rawblock/' + latestHash).json()
+					latestSize = k['size']
+				except:
+					print("Error:", sys.exc_info()[0])
+
+			try:
+				# get coinbase scriptSig from file printed by modified /bcoin/bin/spvnode
+				spvFile = open("/home/pi/.bcoin/spv_cb_" + latestHash)
+				latestCoinbase = spvFile.read()
+				os.remove("/home/pi/.bcoin/spv_cb_" + latestHash)
+			except:
+				print("Error:", sys.exc_info()[0])
 		else:
 			params = {"method": "getblock", "params": [latestHash]}
 			try:
@@ -306,6 +328,8 @@ while True:
 			extraVersion = re.search('/EB[0-9.]+/AD[0-9.]+/', coinbasestring).group(0)
 		if "/EXTBLK/" in coinbasestring:
 			extraVersion = "/EXTBLK/"
+		if "/NYA/" in coinbasestring:
+			extraVersion = "/NYA/"
 			
 		# store up to 40 recent blocks in memory
 		if len(blocks)>40:
