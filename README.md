@@ -22,7 +22,7 @@ Clone this repository:
 
 Add this line to /etc/rc.local to run ClockJr on startup and direct output to log file:
 
-`sudo python -u /home/pi/clockjr/ezbcoin.py > /home/pi/clockjr/clockjr.log`
+`sudo /home/pi/clockjr/startclock.sh  `
 
 Run this command to link the included PHP script to the web root directory:
 

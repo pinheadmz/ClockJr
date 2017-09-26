@@ -25,7 +25,7 @@
 		header('Location: /');
 	}
 	
-	$log = shell_exec("tail -n 10 /home/pi/clockjr/clockjr.log | tac");
+	$log = shell_exec("tail -n 10 /home/pi/clockjr/clocklog.log | tac");
 	
 ?>
 <html>

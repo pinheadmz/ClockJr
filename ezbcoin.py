@@ -79,11 +79,21 @@ DISPLAYS = True
 
 # clear screen on exit
 def cleanup():
+	# clear OLED
 	disp.clear()
 	disp.display()
+	# clear neopixels
 	for i in range(0, strip.numPixels(), 1):
 		strip.setPixelColor(i, Color(0, 0, 0))
 	strip.show()
+	# hopefully gracefully quit bcoin
+	try:
+		params = {"method": "stop", "params": []}
+		stop = requests.post('http://x:0123@127.0.0.1:8332/', json=params).json()
+		print stop
+	except:
+		print("Error:", sys.exc_info()[0])
+	print "Done."
 atexit.register(cleanup)
 
 # is bcoin running?
@@ -264,7 +274,6 @@ while True:
 	latestHeight = info['chain']['height']
 	latestHash = info['chain']['tip']
 	oldHeight = blocks[-1]['height'] if len(blocks)>0 else 0
-	
 	if latestHeight != oldHeight:
 		# get new block info
 		if BCOIN_SPV:
@@ -277,22 +286,15 @@ while True:
 				time.sleep(5)
 				continue
 			latestVersion = header['result']['versionHex']
-			latestSize = "(SPV mode)"
+			latestSize = ""
 			latestCoinbase = ""
 			try:
 				# get block size from 3rd party API
 				j = requests.get('https://blockchain.info/rawblock/' + latestHash).json()
 				latestSize = j['size']
+				print("SPV mode: block " + str(latestHeight) + " size: " + str(latestSize))
 			except:
-                                print("Error:", sys.exc_info()[0])
-				# wait a few seconds then try again, sometimes blockchain.info is behind
-				try:
-					time.sleep(10)
-					k = requests.get('https://blockchain.info/rawblock/' + latestHash).json()
-					latestSize = k['size']
-				except:
-					print("Error:", sys.exc_info()[0])
-
+				print("Error:", sys.exc_info()[0])
 			try:
 				# get coinbase scriptSig from file printed by modified /bcoin/bin/spvnode
 				spvFile = open("/home/pi/.bcoin/spv_cb_" + latestHash)
@@ -313,7 +315,6 @@ while True:
 			latestSize = header['result']['size']
 			latestCoinbase = header['result']['coinbase']
 		
-		
 		# clean up hex from coinbase
 		coinbasestring = ""
 		for i in xrange(0, len(latestCoinbase)-2, 2):
@@ -325,11 +326,11 @@ while True:
 		extraVersion = ""
 		# anything interesting in that coinbase?
 		if "/AD" and "/EB" in coinbasestring:
-			extraVersion = re.search('/EB[0-9.]+/AD[0-9.]+/', coinbasestring).group(0)
-		if "/EXTBLK/" in coinbasestring:
-			extraVersion = "/EXTBLK/"
-		if "/NYA/" in coinbasestring:
-			extraVersion = "/NYA/"
+			extraVersion += re.search('/EB[0-9.]+/AD[0-9.]+/', coinbasestring).group(0)
+		if "/EXTBLK" in coinbasestring:
+			extraVersion += "/EXTBLK"
+		if "/NYA" in coinbasestring:
+			extraVersion += "/NYA"
 			
 		# store up to 40 recent blocks in memory
 		if len(blocks)>40:
@@ -377,7 +378,7 @@ while True:
 				break
 			# modulo ffffff or (255, 255, 255) for color
 			versionColor = hashlib.md5(str(block['version']) + block['extraVersion']).hexdigest()
-			strip.setPixelColor((elapsed/120 + 5)%24, Color(int(versionColor[0:2],16), int(versionColor[2:4],16), int(versionColor[4:6],16)))
+			strip.setPixelColor((elapsed/120 + 5)%24, Color(int(versionColor[6:8],16), int(versionColor[8:10],16), int(versionColor[10:12],16)))
 		# indicate difficulty adjustment period around inner neopixel ring
 		for pixel in range(elapsedLEDs):
 			strip.setPixelColor( 39-((pixel+2)%16), Color(redness, 0, blueness))
@@ -389,7 +390,7 @@ while True:
 	if progress != 1:
 		text = 'bcoin is catching up!'
 		text += '%-10s%-9s%-2.1s' % ('progress: ', int(progress*100000000)/1000000.0, '%')
-		text += '%-8s%13.13s' % ('height: ', latestHeight)
+		text += '%-8s%13.13s' % ('height: ', "{:,}".format(latestHeight))
 		# write text to OLED
 		OLEDtext(text)
 		# don't bother bcoin too much while its syncing
@@ -397,16 +398,27 @@ while True:
 	else:
 		# we're synced! print stats	to OLED
 		text = priceString
-		text += '%-8s%13.13s' % ('height: ', latestHeight)
+		text += '%-8s%13.13s' % ('height: ', "{:,}".format(latestHeight))
 		text += '%-13s%8.8s' % ('version: ', latestVersion)
 		text += '%21.21s' % (extraVersion)
-		text += '%-6s%15.15s' % ('size: ', latestSize)
-		text += '%-15s%6.6s' % ('next diff adj: ', 2016-blocksElapsedInPeriod)
+		if latestSize != '':
+			text += '%-6s%15.15s' % ('size: ', "{:,}".format(latestSize))
+		text += '%-15s%6.6s' % ('next diff adj: ', "{:,}".format(2016-blocksElapsedInPeriod))
 		# write text to OLED
 		OLEDtext(text)
 		# bother bcoin a lot if we're synced!
 		waitBeforeReloadBcoinInfo = 5
-	
+
+	# in SPV mode, keep trying to learn block size
+	if latestSize == '':
+		try:
+			# get block size from 3rd party API
+			j = requests.get('https://blockchain.info/rawblock/' + latestHash).json()
+			latestSize = j['size']
+			print("SPV mode reload: block " + str(latestHeight) + " size: " + str(latestSize))
+		except:
+			print("Error:", sys.exc_info()[0])
+
 	# Pause before requesting info and re-drawing
 	for i in range(waitBeforeReloadBcoinInfo * 2):
 		# Get user input. Check every 1/2 sec for command. If command, restart whole loop
