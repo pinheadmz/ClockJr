@@ -22,7 +22,7 @@ Clone this repository:
 
 Add this line to /etc/rc.local to run ClockJr on startup and direct output to log file:
 
-`sudo /home/pi/clockjr/startclock.sh  `
+`sudo /home/pi/clockjr/startclock.sh`
 
 Run this command to link the included PHP script to the web root directory:
 
