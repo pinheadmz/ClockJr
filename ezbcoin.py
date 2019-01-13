@@ -323,14 +323,14 @@ while True:
 			if not 126 > cint > 32:
 				continue
 			coinbasestring += chr(cint)
-		extraVersion = ""
+		extraVersion = coinbasestring
 		# anything interesting in that coinbase?
-		if "/AD" and "/EB" in coinbasestring:
-			extraVersion += re.search('/EB[0-9.]+/AD[0-9.]+/', coinbasestring).group(0)
-		if "/EXTBLK" in coinbasestring:
-			extraVersion += "/EXTBLK"
-		if "/NYA" in coinbasestring:
-			extraVersion += "/NYA"
+		# if "/AD" and "/EB" in coinbasestring:
+		# 	extraVersion += re.search('/EB[0-9.]+/AD[0-9.]+/', coinbasestring).group(0)
+		# if "/EXTBLK" in coinbasestring:
+		# 	extraVersion += "/EXTBLK"
+		# if "/NYA" in coinbasestring:
+		# 	extraVersion += "/NYA"
 			
 		# store up to 40 recent blocks in memory
 		if len(blocks)>40:
@@ -377,7 +377,7 @@ while True:
 			if  elapsed/120 > 23:
 				break
 			# modulo ffffff or (255, 255, 255) for color
-			versionColor = hashlib.md5(str(block['version']) + block['extraVersion']).hexdigest()
+			versionColor = block['hash'][::-1]
 			strip.setPixelColor((elapsed/120 + 5)%24, Color(int(versionColor[6:8],16), int(versionColor[8:10],16), int(versionColor[10:12],16)))
 		# indicate difficulty adjustment period around inner neopixel ring
 		for pixel in range(elapsedLEDs):
