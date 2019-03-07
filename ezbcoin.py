@@ -109,19 +109,11 @@ def isBcoin():
 
 # restart bcoin if its not running
 def checkAndRestartBcoin():
-	print('checking for bcoin...')
-	if not isBcoin():
-		print('bcoin is not running, restarting...')
-		OLEDtext("Starting bcoin...")
-		os.system('su -c "' + BCOIN_COMMAND + '" - pi')
-		print('giving bcoin a 30 sec head start...')
-		for i in range(30):
-			print(30-i)
-			OLEDtext("Waiting for bcoin... " + str(30-i))
-			time.sleep(1)
-	else:
-		print('bcoin process found!')
-		OLEDtext("bcoin is running!")
+	print('waiting for bcoin...')
+	for i in range(30):
+		print(30-i)
+		OLEDtext("Waiting for bcoin... " + str(30-i))
+		time.sleep(1)
 	return True
 
 # Neopixel rainbow cycle
