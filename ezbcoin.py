@@ -17,7 +17,7 @@ from addwifi import *
 from PIL import Image
 from PIL import ImageFont
 from PIL import ImageDraw
-from neopixel import *
+from rpi_ws281x import *
 
 ### BCOIN startup command ###
 # SPV mode requires mofications to bcoin/bin/spvnode, see README
@@ -324,8 +324,8 @@ while True:
 		# if "/NYA" in coinbasestring:
 		# 	extraVersion += "/NYA"
 			
-		# store up to 40 recent blocks in memory
-		if len(blocks)>40:
+		# store up to 20 recent blocks in memory
+		if len(blocks)>20:
 			blocks.pop(0)
 		blocks.append({"height":latestHeight,"hash":latestHash,"coinbase":coinbasestring,"version":latestVersion,"extraVersion":extraVersion,"size":latestSize,"time":currentTime})
 		
